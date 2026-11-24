@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # FabricCarbot
 
 Fabric 端 Carpet 假人管理模组，面向 Minecraft 26.3，功能参照 MCDReforged 的 BotKikai：
@@ -60,3 +61,7 @@ gradle build
 - 作为 Carpet 扩展（`CarpetExtension`）注册，命令通过 `CarpetServer.manageExtension` 挂载。
 - 假人实体由 Carpet 的 `/player <name> spawn at x y z yaw pitch in <dim>` 原生能力创建，本模组只负责别名映射与坐标记忆。
 - 别名不区分大小写（英文部分），中文别名原样匹配。
+=======
+# fabriccarbot
+Fabric 26.3 Carpet bot management mod with Chinese aliases and coordinate registration - alternative to BotKikai for Fabric
+>>>>>>> 27c0fe51a370817b4b3d2368daa45f453687bd1f
