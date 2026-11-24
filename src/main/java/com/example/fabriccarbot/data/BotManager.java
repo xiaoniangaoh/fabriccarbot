@@ -4,9 +4,10 @@ import com.example.fabriccarbot.FabricCarbot;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
+
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -20,7 +21,7 @@ public class BotManager {
     private final Path BOTS_FILE = CONFIG_DIR.resolve("bots.json");
 
     private final Map<String, BotRecord> botsByName = new HashMap<>();
-    private final Map<String, BotRecord> botsByAlias = new HashMap<>();
+    private final Map<String, List<BotRecord>> botsByAlias = new HashMap<>();
 
     public void load() {
         try {
@@ -35,7 +36,7 @@ public class BotManager {
                 botsByName.put(record.name, record);
                 if (record.aliases != null) {
                     for (String alias : record.aliases) {
-                        botsByAlias.put(alias.toLowerCase(Locale.ROOT), record);
+                        botsByAlias.computeIfAbsent(alias.toLowerCase(Locale.ROOT), k -> new ArrayList<>()).add(record);
                     }
                 }
             }
@@ -63,20 +64,42 @@ public class BotManager {
                 alias != null ? List.of(alias) : List.of(),
                 dimension, x, y, z, yaw, pitch);
         botsByName.put(botName, record);
-        if (alias != null) botsByAlias.put(alias.toLowerCase(Locale.ROOT), record);
+        if (alias != null) {
+            botsByAlias.computeIfAbsent(alias.toLowerCase(Locale.ROOT), k -> new ArrayList<>()).add(record);
+        }
         save();
     }
 
     public void removeBot(String alias) {
-        BotRecord record = botsByAlias.remove(alias.toLowerCase(Locale.ROOT));
-        if (record != null) {
-            botsByName.remove(record.name);
+        List<BotRecord> records = botsByAlias.remove(alias.toLowerCase(Locale.ROOT));
+        if (records != null) {
+            for (BotRecord record : records) {
+                botsByName.remove(record.name);
+            }
             save();
         }
     }
 
-    public BotRecord getBot(String alias) {
-        return botsByAlias.get(alias.toLowerCase(Locale.ROOT));
+    public void removeBotByName(String botName) {
+        BotRecord record = botsByName.remove(botName);
+        if (record != null && record.aliases != null) {
+            for (String alias : record.aliases) {
+                List<BotRecord> list = botsByAlias.get(alias.toLowerCase(Locale.ROOT));
+                if (list != null) {
+                    list.remove(record);
+                    if (list.isEmpty()) botsByAlias.remove(alias.toLowerCase(Locale.ROOT));
+                }
+            }
+            save();
+        }
+    }
+
+    public List<BotRecord> getBotsByAlias(String alias) {
+        return botsByAlias.getOrDefault(alias.toLowerCase(Locale.ROOT), Collections.emptyList());
+    }
+
+    public BotRecord getBotByName(String botName) {
+        return botsByName.get(botName);
     }
 
     public Collection<BotRecord> getAllBots() {

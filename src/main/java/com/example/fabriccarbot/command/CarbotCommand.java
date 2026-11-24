@@ -9,7 +9,11 @@ import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.permissions.LevelBasedPermissionSet;
 import net.minecraft.server.permissions.PermissionLevel;
@@ -17,6 +21,7 @@ import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 
 import static net.minecraft.commands.Commands.argument;
@@ -45,6 +50,9 @@ public class CarbotCommand {
                 .then(literal("remove")
                         .then(argument("alias", StringArgumentType.greedyString())
                                 .executes(ctx -> removeBot(ctx, StringArgumentType.getString(ctx, "alias")))))
+                .then(literal("remove-bot")
+                        .then(argument("botName", StringArgumentType.word())
+                                .executes(ctx -> removeBotByName(ctx, StringArgumentType.getString(ctx, "botName")))))
         );
     }
 
@@ -70,21 +78,24 @@ public class CarbotCommand {
         BotManager manager = FabricCarbot.botManager;
         MinecraftServer server = source.getServer();
 
-        BotRecord bot = manager.getBot(alias);
-        if (bot == null) {
+        List<BotRecord> bots = manager.getBotsByAlias(alias);
+        if (bots.isEmpty()) {
             source.sendFailure(Component.literal("§c未找到别名: §f" + alias));
             return 0;
         }
 
-        // Carpet 26.3 syntax: /player <name> spawn at <x y z> facing <yaw pitch> in <dimension>
-        String dim = bot.dimension;
-        String cmd = String.format(Locale.ROOT,
-                "player %s spawn at %.2f %.2f %.2f facing %.1f %.1f in %s",
-                bot.name, bot.x, bot.y, bot.z, bot.yaw, bot.pitch, dim);
+        final int count = bots.size();
+        for (BotRecord bot : bots) {
+            // Carpet 26.3 syntax: /player <name> spawn at <x y z> facing <yaw pitch> in <dimension>
+            String dim = bot.dimension;
+            String cmd = String.format(Locale.ROOT,
+                    "player %s spawn at %.2f %.2f %.2f facing %.1f %.1f in %s",
+                    bot.name, bot.x, bot.y, bot.z, bot.yaw, bot.pitch, dim);
 
-        manager.executeCommand(server, source, cmd);
+            manager.executeCommand(server, source, cmd);
+        }
 
-        source.sendSuccess(() -> Component.literal("§a已召唤假人: §f" + bot.name + " §a到登记位置"), false);
+        source.sendSuccess(() -> Component.literal("§a已召唤 " + count + " 个假人 (别名: §f" + alias + "§a)"), false);
         return 1;
     }
 
@@ -93,14 +104,18 @@ public class CarbotCommand {
         BotManager manager = FabricCarbot.botManager;
         MinecraftServer server = source.getServer();
 
-        BotRecord bot = manager.getBot(alias);
-        if (bot == null) {
+        List<BotRecord> bots = manager.getBotsByAlias(alias);
+        if (bots.isEmpty()) {
             source.sendFailure(Component.literal("§c未找到别名: §f" + alias));
             return 0;
         }
 
-        manager.executeCommand(server, source, "player " + bot.name + " kill");
-        source.sendSuccess(() -> Component.literal("§a已移除假人: §f" + bot.name), false);
+        final int count = bots.size();
+        for (BotRecord bot : bots) {
+            manager.executeCommand(server, source, "player " + bot.name + " kill");
+        }
+
+        source.sendSuccess(() -> Component.literal("§a已移除 " + count + " 个假人 (别名: §f" + alias + "§a)"), false);
         return 1;
     }
 
@@ -114,20 +129,35 @@ public class CarbotCommand {
             return 1;
         }
 
-        StringBuilder sb = new StringBuilder("§a已登记假人:\n");
+        MutableComponent header = Component.literal("§a已登记假人:\n");
         for (BotRecord bot : bots) {
             String aliases = (bot.aliases != null && !bot.aliases.isEmpty())
                     ? String.join(", ", bot.aliases)
                     : "(无)";
-            sb.append("§7- §f")
-              .append(bot.name)
-              .append(" §7[§f")
-              .append(aliases)
-              .append("§7] @ §f")
-              .append(bot.dimension)
-              .append("\n");
+
+            MutableComponent line = Component.literal("§7- §f" + bot.name + " §7[§f" + aliases + "§7] @ §f" + bot.dimension + " ");
+
+            // Spawn button
+            MutableComponent spawnBtn = Component.literal("§a[召唤]")
+                    .setStyle(Style.EMPTY
+                            .withClickEvent(new ClickEvent.RunCommand("/carbot spawn " + bot.getFirstAliasOrName()))
+                            .withHoverEvent(new HoverEvent.ShowText(Component.literal("点击召唤该位置的假人"))));
+
+            // Kill button
+            MutableComponent killBtn = Component.literal("§c[移除]")
+                    .setStyle(Style.EMPTY
+                            .withClickEvent(new ClickEvent.RunCommand("/carbot kill " + bot.getFirstAliasOrName()))
+                            .withHoverEvent(new HoverEvent.ShowText(Component.literal("点击移除该位置的假人"))));
+
+            // Remove record button
+            MutableComponent removeBtn = Component.literal("§e[删除记录]")
+                    .setStyle(Style.EMPTY
+                            .withClickEvent(new ClickEvent.RunCommand("/carbot remove-bot " + bot.name))
+                            .withHoverEvent(new HoverEvent.ShowText(Component.literal("点击删除该假人的登记记录"))));
+
+            header.append(line).append(spawnBtn).append(" ").append(killBtn).append(" ").append(removeBtn).append("\n");
         }
-        source.sendSuccess(() -> Component.literal(sb.toString()), false);
+        source.sendSuccess(() -> header, false);
         return 1;
     }
 
@@ -135,13 +165,29 @@ public class CarbotCommand {
         CommandSourceStack source = ctx.getSource();
         BotManager manager = FabricCarbot.botManager;
 
-        BotRecord bot = manager.getBot(alias);
-        if (bot == null) {
+        List<BotRecord> bots = manager.getBotsByAlias(alias);
+        if (bots.isEmpty()) {
             source.sendFailure(Component.literal("§c未找到别名: §f" + alias));
             return 0;
         }
 
+        int count = bots.size();
         manager.removeBot(alias);
+        source.sendSuccess(() -> Component.literal("§a已删除 " + count + " 条假人记录 (别名: §f" + alias + "§a)"), false);
+        return 1;
+    }
+
+    private static int removeBotByName(CommandContext<CommandSourceStack> ctx, String botName) {
+        CommandSourceStack source = ctx.getSource();
+        BotManager manager = FabricCarbot.botManager;
+
+        BotRecord bot = manager.getBotByName(botName);
+        if (bot == null) {
+            source.sendFailure(Component.literal("§c未找到假人: §f" + botName));
+            return 0;
+        }
+
+        manager.removeBotByName(botName);
         source.sendSuccess(() -> Component.literal("§a已删除假人记录: §f" + bot.name), false);
         return 1;
     }
