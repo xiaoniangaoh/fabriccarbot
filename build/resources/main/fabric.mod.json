@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "fabriccarbot",
+  "version": "1.0.0",
+  "name": "FabricCarbot",
+  "description": "Carpet 假人一键召唤管理（中文别名、登记坐标），Fabric 26.3 端替代 bot_kikai",
+  "authors": ["You"],
+  "contact": {},
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.example.fabriccarbot.FabricCarbot"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "26.3",
+    "java": ">=25",
+    "fabric-api": "*",
+    "carpet": "*"
+  },
+  "custom": {
+    "modmenu": {
+      "parent": "carpet"
+    }
+  }
+}

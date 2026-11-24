@@ -1,0 +1,11 @@
+{
+  "command.fabriccarbot.added": "§a已登记假人: §f%s §a(别名: §f%s§a)",
+  "command.fabriccarbot.spawned": "§a已召唤假人: §f%s §a到登记位置",
+  "command.fabriccarbot.killed": "§a已移除假人: §f%s",
+  "command.fabriccarbot.not_found": "§c未找到别名: §f%s",
+  "command.fabriccarbot.list_title": "§a已登记假人:",
+  "command.fabriccarbot.list_entry": "§7- §f%s §7[§f%s§7] @ §f%s",
+  "command.fabriccarbot.removed": "§a已删除假人记录: §f%s",
+  "command.fabriccarbot.empty": "§c暂无登记假人",
+  "command.fabriccarbot.usage": "§c用法: /carbot add <botName> <alias> | /carbot spawn <alias> | /carbot kill <alias> | /carbot list | /carbot remove <alias>"
+}
